@@ -12,7 +12,7 @@ const messageMap: IMessageMap = {
     home: () => import('@/i18n/nl/home'),
 };
 
-function getObjectReferenceByPath(obj: any, path: string) {
+function getObjectReferenceByPath(obj: any, path: string): string {
     return path.split('.').reduce((prev, key) => {
         return prev[key];
     }, obj)
@@ -39,14 +39,28 @@ export async function useTraduko(moduleNames: string[]): Promise<IUseTraduko> {
         return prev;
     }, {});
 
-    function t(path: string): string {
+    function t(path: string, params: any = {}): string {
         const [moduleName, ...rest] = path.split('.');
+        const paramKeys = Object.keys(params);
 
         try {
-            return getObjectReferenceByPath(
+            let textResult = getObjectReferenceByPath(
                 mappedModules[moduleName],
                 rest.join('.'),
             );
+
+            if (paramKeys.length > 0) {
+                const mappedKeys = paramKeys.map((key) => {
+                    return `{${key}\\?*}`;
+                });
+                const regex = new RegExp(mappedKeys.join('|'), 'gi');
+
+                textResult = textResult.replace(regex, (matched) => {
+                    return params[matched.replace(/[{}?]/g, '')];
+                });
+            }
+
+            return textResult;
         } catch {
             console.warn(`[vue-traduko]: translation with path: '${path}' could not be found.`);
 
