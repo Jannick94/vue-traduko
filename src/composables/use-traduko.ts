@@ -1,3 +1,5 @@
+import { ref } from 'vue';
+
 interface IUseTraduko {
     resolvedModules: Object,
     t: Function,
@@ -7,9 +9,15 @@ interface IMessageMap {
     [key: string]: Function,
 }
 
-const messageMap: IMessageMap = {
-    invoices: () => import('@/i18n/nl/invoices'),
-    home: () => import('@/i18n/nl/home'),
+const messageMap: any = {
+    invoices: {
+        nl: () => import('@/i18n/nl/invoices'),
+        en: () => import('@/i18n/en/invoices'),
+    },
+    home: {
+        nl: () => import('@/i18n/nl/home'),
+        en: () => import('@/i18n/en/home'),
+    }
 };
 
 function getObjectReferenceByPath(obj: any, path: string): string {
@@ -18,26 +26,42 @@ function getObjectReferenceByPath(obj: any, path: string): string {
     }, obj)
 }
 
-export async function useTraduko(moduleNames: string[]): Promise<IUseTraduko> {
-    const modulePromises = moduleNames.map(async (name) => {
-        try {
-            const moduleResult = await messageMap[name]();
+export function useTraduko(defaultLocale = 'nl')  {
+    const locale = ref(defaultLocale);
+    const resolvedModules = ref();
+    const mappedModules = ref();
+    const loadedModules = ref([]);
 
-            return {
-                name,
-                moduleResult,
-            };
-        } catch {
-            throw new Error(`[vue-traduko]: translation module with name: '${name}' could not be found in config.`);
-        }
-    });
+    async function initializeTranslations(moduleNames: string[]) {
+        loadedModules.value = moduleNames;
 
-    const resolvedModules = await Promise.all(modulePromises);
-    const mappedModules = resolvedModules.reduce((prev: any, resolvedModule) => {
-        prev[resolvedModule.name] = resolvedModule.moduleResult.default;
+        const modulePromises = moduleNames.map(async (name) => {
+            try {
+                const moduleResult = await messageMap[name][locale.value]();
 
-        return prev;
-    }, {});
+                return {
+                    name,
+                    moduleResult,
+                };
+            } catch {
+                throw new Error(`[vue-traduko]: translation module with name: '${name}' could not be found in config.`);
+            }
+        });
+
+        resolvedModules.value = await Promise.all(modulePromises);
+
+        mappedModules.value = resolvedModules.value.reduce((prev: any, resolvedModule: any) => {
+            prev[resolvedModule.name] = resolvedModule.moduleResult.default;
+
+            return prev;
+        }, {});
+    }
+
+    function setLocale(localeKey: string) {
+        locale.value = localeKey;
+
+        initializeTranslations(loadedModules.value);
+    }
 
     function t(path: string, params: any = {}): string {
         const [moduleName, ...rest] = path.split('.');
@@ -45,7 +69,7 @@ export async function useTraduko(moduleNames: string[]): Promise<IUseTraduko> {
 
         try {
             let textResult = getObjectReferenceByPath(
-                mappedModules[moduleName],
+                mappedModules.value[moduleName],
                 rest.join('.'),
             );
 
@@ -69,7 +93,10 @@ export async function useTraduko(moduleNames: string[]): Promise<IUseTraduko> {
     }
 
     return {
+        locale,
         resolvedModules,
+        initializeTranslations,
+        setLocale,
         t,
     };
 }

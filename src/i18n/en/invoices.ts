@@ -2,10 +2,10 @@ export default {
     foo: 'bar',
     nested: {
         with: {
-            text: 'Geneste tekst',
+            text: 'Nested text',
         },
     },
-    param: 'Welkom meneer {firstname} {lastname}!',
+    param: 'Welcome sir {firstname} {lastname}!',
     list: [
         { name: 'test1' },
         { name: 'test2' },
